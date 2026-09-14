@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>펌프 성능시험 자동 계산기</title>
+<style>
+  :root{
+    --bg:#0f172a;
+    --card:#ffffff;
+    --accent:#1d4ed8;
+    --accent-light:#dbeafe;
+    --yellow:#fef9c3;
+    --yellow-border:#eab308;
+    --good:#16a34a;
+    --good-bg:#dcfce7;
+    --bad:#dc2626;
+    --bad-bg:#fee2e2;
+    --text:#111827;
+    --muted:#6b7280;
+    --border:#e5e7eb;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+    background:linear-gradient(180deg,#0f172a 0%,#1e3a8a 220px,#f1f5f9 220px);
+    color:var(--text);
+    padding-bottom:40px;
+  }
+  header{
+    padding:28px 20px 20px;
+    color:#fff;
+    text-align:center;
+  }
+  header h1{
+    font-size:1.3rem;
+    margin:0 0 6px;
+    font-weight:700;
+  }
+  header p{
+    margin:0;
+    font-size:0.85rem;
+    color:#bfdbfe;
+  }
+  .container{
+    max-width:640px;
+    margin:0 auto;
+    padding:0 14px;
+  }
+  .card{
+    background:var(--card);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:16px;
+    box-shadow:0 4px 16px rgba(15,23,42,0.08);
+  }
+  .card h2{
+    font-size:1rem;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:22px;height:22px;
+    border-radius:50%;
+    background:var(--accent);
+    color:#fff;
+    font-size:0.75rem;
+    font-weight:700;
+    flex-shrink:0;
+  }
+  .card .hint{
+    font-size:0.78rem;
+    color:var(--muted);
+    margin:0 0 14px;
+  }
+  .input-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  label{
+    font-size:0.78rem;
+    color:var(--muted);
+    display:block;
+    margin-bottom:4px;
+  }
+  input[type=number]{
+    width:100%;
+    padding:10px 10px;
+    font-size:1rem;
+    border-radius:10px;
+    border:1.5px solid var(--yellow-border);
+    background:var(--yellow);
+    color:var(--text);
+    font-weight:600;
+  }
+  input[type=number]:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  .derived{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-top:14px;
+  }
+  .derived div{
+    background:var(--accent-light);
+    border-radius:10px;
+    padding:8px 10px;
+  }
+  .derived div span.k{
+    display:block;
+    font-size:0.7rem;
+    color:#1e40af;
+  }
+  .derived div span.v{
+    display:block;
+    font-size:1rem;
+    font-weight:700;
+    color:#1e3a8a;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:0.78rem;
+  }
+  th{
+    background:#f8fafc;
+    color:var(--muted);
+    font-weight:600;
+    padding:6px 4px;
+    border-bottom:1px solid var(--border);
+    text-align:center;
+  }
+  td{
+    padding:8px 4px;
+    text-align:center;
+    border-bottom:1px solid var(--border);
+    vertical-align:middle;
+  }
+  td.name{
+    text-align:left;
+    font-weight:600;
+    font-size:0.75rem;
+  }
+  td input[type=number]{
+    width:70px;
+    padding:6px 4px;
+    text-align:center;
+    font-size:0.85rem;
+  }
+  .pass{
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:0.72rem;
+    background:var(--good-bg);
+    color:var(--good);
+  }
+  .fail{
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:999px;
+    font-weight:700;
+    font-size:0.72rem;
+    background:var(--bad-bg);
+    color:var(--bad);
+  }
+  .rules{
+    font-size:0.75rem;
+    color:var(--muted);
+    line-height:1.6;
+    background:#f8fafc;
+    border-radius:10px;
+    padding:12px 14px;
+    margin-top:6px;
+  }
+  .rules b{color:var(--text);}
+  footer{
+    text-align:center;
+    color:#94a3b8;
+    font-size:0.72rem;
+    margin-top:10px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚒 펌프 성능시험 자동 계산기</h1>
+  <p>NFTC 103 기준 · 모바일 최적화 버전</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2><span class="badge">1</span>펌프 정격 제원 입력</h2>
+    <p class="hint">노란색 칸에 정격 유량, 양정, 동력을 입력하세요</p>
+    <div class="input-row">
+      <div>
+        <label>정격토출유량 (LPM)</label>
+        <input type="number" id="ratedFlow" value="800" step="1">
+      </div>
+      <div>
+        <label>정격양정 (m)</label>
+        <input type="number" id="ratedHead" value="40" step="0.1">
+      </div>
+    </div>
+    <div class="input-row" style="grid-template-columns:1fr;">
+      <div>
+        <label>동력 (Kw)</label>
+        <input type="number" id="ratedPower" value="95" step="0.1">
+      </div>
+    </div>
+
+    <div class="derived">
+      <div><span class="k">정격토출유량 (m³/min)</span><span class="v" id="flowM3min">-</span></div>
+      <div><span class="k">정격토출유량 (m³/h)</span><span class="v" id="flowM3h">-</span></div>
+      <div><span class="k">정격토출압력 (MPa)</span><span class="v" id="pressMPa">-</span></div>
+      <div><span class="k">정격토출압력 (kgf/cm²)</span><span class="v" id="pressKgf">-</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="badge">2</span>시험 결과 및 판정</h2>
+    <p class="hint">노란색 칸에 토출압력(측정값)을 입력하세요</p>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>성능시험</th>
+          <th>유량<br>(LPM)</th>
+          <th>기준압력<br>(MPa)</th>
+          <th>측정압력<br>(MPa)</th>
+          <th>측정압력<br>(kgf/cm²)</th>
+          <th>적합여부</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name">체절운전<br>(0%)</td>
+          <td id="flow0">-</td>
+          <td id="std0">-</td>
+          <td><input type="number" id="meas0" value="0.41" step="0.01"></td>
+          <td id="kgf0">-</td>
+          <td id="pass0">-</td>
+        </tr>
+        <tr>
+          <td class="name">정격부하운전<br>(100%)</td>
+          <td id="flow100">-</td>
+          <td id="std100">-</td>
+          <td><input type="number" id="meas100" value="0.56" step="0.01"></td>
+          <td id="kgf100">-</td>
+          <td id="pass100">-</td>
+        </tr>
+        <tr>
+          <td class="name">최대운전<br>(150%)</td>
+          <td id="flow150">-</td>
+          <td id="std150">-</td>
+          <td><input type="number" id="meas150" value="0.38" step="0.01"></td>
+          <td id="kgf150">-</td>
+          <td id="pass150">-</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="rules">
+      ※ NFPC 기준에 따라 합격 여부 판정이 자동으로 표시됩니다.<br>
+      <b>체절운전</b> : 토출압력이 정격토출압력의 140% 미만일 것<br>
+      <b>정격부하운전</b> : 정격토출량의 100%에서 정격토출압력 이상일 것<br>
+      <b>최대운전</b> : 정격토출량의 150%에서 정격토출압력의 65% 이상일 것
+    </div>
+  </div>
+
+  <footer>소방펌프 성능시험 계산기 · 원본 스프레드시트 기반</footer>
+</div>
+
+<script>
+function num(id){ return parseFloat(document.getElementById(id).value) || 0; }
+function set(id, val){ document.getElementById(id).textContent = val; }
+
+function recalc(){
+  const flow = num('ratedFlow');      // LPM
+  const head = num('ratedHead');      // m
+  const power = num('ratedPower');    // kW
+
+  const flowM3min = flow / 1000;
+  const flowM3h = flow * 60 / 1000;
+  const pressMPa = head * 0.0098066; // m -> MPa (head*g/1000, g=9.8066)
+  const pressKgf = pressMPa * 10;    // matches sheet's simple x10 conversion
+
+  set('flowM3min', flowM3min.toFixed(2));
+  set('flowM3h', flowM3h.toFixed(0));
+  set('pressMPa', pressMPa.toFixed(2));
+  set('pressKgf', pressKgf.toFixed(2));
+
+  // Test flows
+  const flow0 = 0;
+  const flow100 = flow;
+  const flow150 = flow * 1.5;
+  set('flow0', flow0.toLocaleString());
+  set('flow100', flow100.toLocaleString());
+  set('flow150', flow150.toLocaleString());
+
+  // Standard pressures
+  const std0 = pressMPa * 1.4;
+  const std100 = pressMPa;
+  const std150 = pressMPa * 0.65;
+  set('std0', std0.toFixed(2));
+  set('std100', std100.toFixed(2));
+  set('std150', std150.toFixed(2));
+
+  // Measured
+  const meas0 = num('meas0');
+  const meas100 = num('meas100');
+  const meas150 = num('meas150');
+
+  set('kgf0', (meas0*10).toFixed(2));
+  set('kgf100', (meas100*10).toFixed(2));
+  set('kgf150', (meas150*10).toFixed(2));
+
+  const pass0 = meas0 < std0;
+  const pass100 = meas100 >= std100;
+  const pass150 = meas150 >= std150;
+
+  setPass('pass0', pass0);
+  setPass('pass100', pass100);
+  setPass('pass150', pass150);
+}
+
+function setPass(id, ok){
+  const el = document.getElementById(id);
+  el.innerHTML = ok ? '<span class="pass">적합</span>' : '<span class="fail">부적합</span>';
+}
+
+document.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
+recalc();
+</script>
+
+</body>
+</html>
