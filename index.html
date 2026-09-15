@@ -105,6 +105,29 @@
     outline:2px solid var(--accent);
     outline-offset:1px;
   }
+  .unit-field{
+    display:flex;
+    gap:6px;
+  }
+  .unit-field input[type=number]{
+    flex:1 1 auto;
+    min-width:0;
+  }
+  select.unit-select{
+    flex:0 0 auto;
+    width:auto;
+    padding:0 8px;
+    font-size:0.85rem;
+    font-weight:600;
+    border-radius:10px;
+    border:1.5px solid var(--border);
+    background:#fff;
+    color:var(--text);
+  }
+  select.unit-select:focus{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
   .derived{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -207,12 +230,26 @@
     <p class="hint">노란색 칸에 정격 유량, 양정, 동력을 입력하세요</p>
     <div class="input-row">
       <div>
-        <label>정격토출유량 (LPM)</label>
-        <input type="number" id="ratedFlow" value="800" step="1">
+        <label>정격토출유량</label>
+        <div class="unit-field">
+          <input type="number" id="ratedFlow" value="800" step="1">
+          <select class="unit-select" id="flowUnit">
+            <option value="LPM" selected>LPM</option>
+            <option value="m3min">m³/min</option>
+            <option value="m3h">m³/h</option>
+          </select>
+        </div>
       </div>
       <div>
-        <label>정격양정 (m)</label>
-        <input type="number" id="ratedHead" value="40" step="0.1">
+        <label>정격양정</label>
+        <div class="unit-field">
+          <input type="number" id="ratedHead" value="40" step="0.1">
+          <select class="unit-select" id="headUnit">
+            <option value="m" selected>m</option>
+            <option value="kgfcm2">kgf/cm²</option>
+            <option value="MPa">MPa</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="input-row" style="grid-template-columns:1fr;">
@@ -223,10 +260,10 @@
     </div>
 
     <div class="derived">
-      <div><span class="k">정격토출유량 (m³/min)</span><span class="v" id="flowM3min">-</span></div>
-      <div><span class="k">정격토출유량 (m³/h)</span><span class="v" id="flowM3h">-</span></div>
-      <div><span class="k">정격토출압력 (MPa)</span><span class="v" id="pressMPa">-</span></div>
-      <div><span class="k">정격토출압력 (kgf/cm²)</span><span class="v" id="pressKgf">-</span></div>
+      <div><span class="k" id="flowDerivedLabel1">-</span><span class="v" id="flowDerivedValue1">-</span></div>
+      <div><span class="k" id="pressDerivedLabel1">-</span><span class="v" id="pressDerivedValue1">-</span></div>
+      <div><span class="k" id="flowDerivedLabel2">-</span><span class="v" id="flowDerivedValue2">-</span></div>
+      <div><span class="k" id="pressDerivedLabel2">-</span><span class="v" id="pressDerivedValue2">-</span></div>
     </div>
   </div>
 
@@ -289,20 +326,84 @@
 function num(id){ return parseFloat(document.getElementById(id).value) || 0; }
 function set(id, val){ document.getElementById(id).textContent = val; }
 
+// 단위 -> 기준단위(LPM, m) 환산 계수
+const FLOW_TO_LPM = { LPM:1, m3min:1000, m3h:1000/60 };
+const HEAD_TO_M   = { m:1, kgfcm2:10, MPa:100 };
+
+const FLOW_ORDER = ['LPM','m3min','m3h'];
+const FLOW_LABEL = { LPM:'정격토출유량 (LPM)', m3min:'정격토출유량 (m³/min)', m3h:'정격토출유량 (m³/h)' };
+
+const HEAD_ORDER = ['m','MPa','kgfcm2'];
+const HEAD_LABEL = { m:'정격양정 (m)', MPa:'정격토출압력 (MPa)', kgfcm2:'정격토출압력 (kgf/cm²)' };
+
+function flowValueInUnit(lpm, unit){
+  return lpm / FLOW_TO_LPM[unit];
+}
+function formatFlow(value, unit){
+  if(unit==='LPM') return value.toLocaleString(undefined,{maximumFractionDigits:1});
+  if(unit==='m3h') return value.toFixed(0);
+  return value.toFixed(2);
+}
+
+function headValueInUnit(headM, unit){
+  return headM / HEAD_TO_M[unit];
+}
+function formatHead(value, unit){
+  return unit==='m' ? value.toFixed(1) : value.toFixed(2);
+}
+
+function getFlowLPM(){
+  const unit = document.getElementById('flowUnit').value;
+  return num('ratedFlow') * FLOW_TO_LPM[unit];
+}
+function getHeadM(){
+  const unit = document.getElementById('headUnit').value;
+  return num('ratedHead') * HEAD_TO_M[unit];
+}
+
+// 단위를 바꿀 때 입력값을 새 단위 기준으로 다시 표시(물리량은 유지)
+function onFlowUnitChange(newUnit, oldUnit){
+  const input = document.getElementById('ratedFlow');
+  const lpm = (parseFloat(input.value) || 0) * FLOW_TO_LPM[oldUnit];
+  const converted = lpm / FLOW_TO_LPM[newUnit];
+  input.value = Math.round(converted * 1000) / 1000;
+}
+function onHeadUnitChange(newUnit, oldUnit){
+  const input = document.getElementById('ratedHead');
+  const m = (parseFloat(input.value) || 0) * HEAD_TO_M[oldUnit];
+  const converted = m / HEAD_TO_M[newUnit];
+  input.value = Math.round(converted * 1000) / 1000;
+}
+
+// 입력 드롭박스에서 고른 단위는 제외하고, 나머지 단위 중 2개를 파생 카드에 표시
+function renderFlowDerived(lpm){
+  const selected = document.getElementById('flowUnit').value;
+  const remaining = FLOW_ORDER.filter(u => u !== selected).slice(0, 2);
+  remaining.forEach((unit, i) => {
+    const val = flowValueInUnit(lpm, unit);
+    set('flowDerivedLabel' + (i+1), FLOW_LABEL[unit]);
+    set('flowDerivedValue' + (i+1), formatFlow(val, unit));
+  });
+}
+function renderHeadDerived(headM){
+  const selected = document.getElementById('headUnit').value;
+  const remaining = HEAD_ORDER.filter(u => u !== selected).slice(0, 2);
+  remaining.forEach((unit, i) => {
+    const val = headValueInUnit(headM, unit);
+    set('pressDerivedLabel' + (i+1), HEAD_LABEL[unit]);
+    set('pressDerivedValue' + (i+1), formatHead(val, unit));
+  });
+}
+
 function recalc(){
-  const flow = num('ratedFlow');      // LPM
-  const head = num('ratedHead');      // m
+  const flow = getFlowLPM();          // LPM 기준으로 환산된 값
+  const head = getHeadM();            // m 기준으로 환산된 값
   const power = num('ratedPower');    // kW
 
-  const flowM3min = flow / 1000;
-  const flowM3h = flow * 60 / 1000;
-  const pressMPa = head * 0.0098066; // m -> MPa (head*g/1000, g=9.8066)
-  const pressKgf = pressMPa * 10;    // matches sheet's simple x10 conversion
+  const pressMPa = head * 0.01; // m -> MPa (head*g/1000, g=10)
 
-  set('flowM3min', flowM3min.toFixed(2));
-  set('flowM3h', flowM3h.toFixed(0));
-  set('pressMPa', pressMPa.toFixed(2));
-  set('pressKgf', pressKgf.toFixed(2));
+  renderFlowDerived(flow);
+  renderHeadDerived(head);
 
   // Test flows
   const flow0 = 0;
@@ -344,6 +445,24 @@ function setPass(id, ok){
 }
 
 document.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
+
+// 단위 변경 시: 값 변환 후 재계산 (직전 단위 기억)
+const flowUnitEl = document.getElementById('flowUnit');
+const headUnitEl = document.getElementById('headUnit');
+let prevFlowUnit = flowUnitEl.value;
+let prevHeadUnit = headUnitEl.value;
+
+flowUnitEl.addEventListener('change', function(){
+  onFlowUnitChange(this.value, prevFlowUnit);
+  prevFlowUnit = this.value;
+  recalc();
+});
+headUnitEl.addEventListener('change', function(){
+  onHeadUnitChange(this.value, prevHeadUnit);
+  prevHeadUnit = this.value;
+  recalc();
+});
+
 recalc();
 </script>
 
